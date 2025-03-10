@@ -3,7 +3,6 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module System.Metrics.Network.Forwarder
   ( connectToAcceptor
@@ -50,14 +49,16 @@ import           System.Metrics.Configuration (ForwarderConfiguration (..), HowT
 import           System.Metrics.Store.Forwarder (mkResponse, mkResponseDummy)
 import qualified System.Metrics.Protocol.Forwarder as Forwarder
 import qualified System.Metrics.Protocol.Codec as Forwarder
+import           System.Metrics.Store.Deltify
+
 
 connectToAcceptor
   :: ForwarderConfiguration
   -> EKG.Store
   -> IO ()
-connectToAcceptor config@ForwarderConfiguration{..} ekgStore = withIOManager \iocp -> do
+connectToAcceptor config@ForwarderConfiguration{..} ekgStore = withIOManager \iocp ->
   let app = forwarderApp config ekgStore
-  case acceptorEndpoint of
+  in case acceptorEndpoint of
     LocalPipe localPipe -> do
       let snocket = localSnocket iocp
           address = localAddressFromPath localPipe
@@ -102,7 +103,7 @@ doConnectToAcceptor snocket makeBearer configureSocket address timeLimits app =
     versions = simpleSingletonVersions
        UnversionedProtocol
        UnversionedProtocolData
-       app
+       (const app)
 
     localAddress  :: Maybe addr
     remoteAddress :: addr
@@ -131,8 +132,9 @@ forwarderApp config ekgStore =
   OuroborosApplication
     [ MiniProtocol
         { miniProtocolNum    = MiniProtocolNum 2
+        , miniProtocolStart  = Mux.StartEagerly
         , miniProtocolLimits = MiniProtocolLimits { maximumIngressQueue = maxBound }
-        , miniProtocolRun    = forwardEKGMetrics config ekgStore
+        , miniProtocolRun    = if useDummyForwarder config then forwardEKGMetricsDummy else forwardEKGMetrics config ekgStore
         }
     ]
 
@@ -141,26 +143,28 @@ forwardEKGMetrics
   -> EKG.Store
   -> RunMiniProtocol 'Mux.InitiatorMode initiatorCtx responderCtx LBS.ByteString IO () Void
 forwardEKGMetrics config ekgStore =
-  InitiatorProtocolOnly $ MiniProtocolCb \_ctx channel ->
+  InitiatorProtocolOnly $ MiniProtocolCb \_ctx channel -> do
+    deltify <- mkDeltify
     runPeer
       (forwarderTracer config)
       (Forwarder.codecEKGForward CBOR.encode CBOR.decode
                                  CBOR.encode CBOR.decode)
       channel
-      (Forwarder.ekgForwarderPeer $ mkResponse config ekgStore)
+      (Forwarder.ekgForwarderPeer $ mkResponse config deltify ekgStore)
 
 forwardEKGMetricsResp
   :: ForwarderConfiguration
   -> EKG.Store
   -> RunMiniProtocol 'Mux.ResponderMode initiatorCtx responderCtx LBS.ByteString IO Void ()
 forwardEKGMetricsResp config ekgStore =
-  ResponderProtocolOnly $ MiniProtocolCb \_ctx channel ->
+  ResponderProtocolOnly $ MiniProtocolCb \_ctx channel -> do
+    deltify <- mkDeltify
     runPeer
       (forwarderTracer config)
       (Forwarder.codecEKGForward CBOR.encode CBOR.decode
                                  CBOR.encode CBOR.decode)
       channel
-      (Forwarder.ekgForwarderPeer $ mkResponse config ekgStore)
+      (Forwarder.ekgForwarderPeer $ mkResponse config deltify ekgStore)
 
 forwardEKGMetricsDummy
   :: RunMiniProtocol 'Mux.InitiatorMode initiatorCtx responderCtx LBS.ByteString IO () Void

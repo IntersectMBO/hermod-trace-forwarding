@@ -107,7 +107,7 @@ doListenToForwarder snocket makeBearer configureSocket address timeLimits app = 
     (simpleSingletonVersions
       UnversionedProtocol
       UnversionedProtocolData
-      (SomeResponderApplication app))
+      (\_ -> SomeResponderApplication app))
     nullErrorPolicies
     $ \_ serverAsync -> wait serverAsync -- Block until async exception.
 
@@ -123,6 +123,7 @@ acceptorApp config mkStores peerErrorHandler =
   OuroborosApplication [
     MiniProtocol
       { miniProtocolNum    = MiniProtocolNum 2
+      , miniProtocolStart  = Mux.StartEagerly
       , miniProtocolLimits = MiniProtocolLimits { maximumIngressQueue = maxBound }
       , miniProtocolRun    = acceptEKGMetricsResp config mkStores peerErrorHandler
       }
