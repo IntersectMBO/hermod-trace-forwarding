@@ -11,7 +11,7 @@ repository cardano-haskell-packages
 
 index-state:
   , hackage.haskell.org 2026-06-19T06:20:58Z
-  , cardano-haskell-packages 2026-03-19T11:07:17Z
+  , cardano-haskell-packages 2026-09-04T09:27:20Z
 
 packages:
   ekg-forward
