@@ -1,3 +1,6 @@
-# xxxx Committee Changelog
+# Changelog for the hermod-trace-forwarding Project
 
-All major changes to this project will be documented in this file.
+## September 2026
+
+* Initial repository setup, mirroring `hermod-tracing`'s Nix/CI scaffolding.
+* Add placeholder `ekg-forward` package.
