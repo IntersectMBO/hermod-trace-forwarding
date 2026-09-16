@@ -1,0 +1,151 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE RecordWildCards #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">System.Metrics.Store.Deltify</span><span>
+</span><span id="line-4"></span><span>       </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-identifier">Deltify</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-5"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#mkDeltify"><span class="hs-identifier">mkDeltify</span></a></span><span>
+</span><span id="line-6"></span><span>       </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Concurrent.Class.MonadSTM.TVar</span></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Class.MonadSTM</span></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Strict</span></span><span>                    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HM</span></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">System.Metrics</span></span><span>                         </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Sample</span></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">data</span><span> </span><span id="Deltify"><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-identifier hs-var">Deltify</span></a></span></span><span> </span><span id="local-6989586621679118327"><span class="annot"><a href="#local-6989586621679118327"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Deltify"><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-identifier hs-var">Deltify</span></a></span></span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="deltaPutAll"><span class="annot"><span class="annottext">forall (m :: * -&gt; *). Deltify m -&gt; Sample -&gt; m ()
+</span><a href="System.Metrics.Store.Deltify.html#deltaPutAll"><span class="hs-identifier hs-var hs-var">deltaPutAll</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679118327"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>           </span><span class="annot"><span class="hs-comment">-- ^ put an entire Sample into the backbuffer</span></span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="deltaDeltify"><span class="annot"><span class="annottext">forall (m :: * -&gt; *). Deltify m -&gt; Sample -&gt; m Sample
+</span><a href="System.Metrics.Store.Deltify.html#deltaDeltify"><span class="hs-identifier hs-var hs-var">deltaDeltify</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679118327"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span>       </span><span class="annot"><span class="hs-comment">-- ^ return delta to current backbuffer, and update backbuffer</span></span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="deltaPutDelta"><span class="annot"><span class="annottext">forall (m :: * -&gt; *). Deltify m -&gt; Sample -&gt; m ()
+</span><a href="System.Metrics.Store.Deltify.html#deltaPutDelta"><span class="hs-identifier hs-var hs-var">deltaPutDelta</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679118327"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>           </span><span class="annot"><span class="hs-comment">-- ^ apply delta to backbuffer</span></span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">newtype</span><span> </span><span id="BackBuffer"><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="BackBuffer"><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span>        </span><span class="annot"><span class="hs-comment">-- ^ the backbuffer holds the latest sample that was base for a Response</span></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-pragma">{-# SPECIALIZE</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#mkDeltify"><span class="hs-pragma hs-type">mkDeltify</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/ghc-prim-0.10.0/src/GHC.Types.html#IO"><span class="hs-pragma hs-type">IO</span></a></span><span> </span><span class="hs-pragma">(</span><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-pragma hs-type">Deltify</span></a></span><span> </span><span class="annot"><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/ghc-prim-0.10.0/src/GHC.Types.html#IO"><span class="hs-pragma hs-type">IO</span></a></span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-24"></span><span id="local-6989586621679118333"><span class="annot"><a href="System.Metrics.Store.Deltify.html#mkDeltify"><span class="hs-identifier hs-type">mkDeltify</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadSTM</span></span><span> </span><span class="annot"><a href="#local-6989586621679118333"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679118333"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-identifier hs-type">Deltify</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679118333"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-25"></span><span id="mkDeltify"><span class="annot"><span class="annottext">mkDeltify :: forall (m :: * -&gt; *). MonadSTM m =&gt; m (Deltify m)
+</span><a href="System.Metrics.Store.Deltify.html#mkDeltify"><span class="hs-identifier hs-var hs-var">mkDeltify</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-26"></span><span>  </span><span id="local-6989586621679118389"><span class="annot"><span class="annottext">TVar m BackBuffer
+</span><a href="#local-6989586621679118389"><span class="hs-identifier hs-var">backBuffer</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">BackBuffer -&gt; m (TVar m BackBuffer)
+forall a. a -&gt; m (TVar m a)
+forall (m :: * -&gt; *) a. MonadSTM m =&gt; a -&gt; m (TVar m a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer
+</span><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span><span> </span><span class="annot"><span class="annottext">Sample
+forall k v. HashMap k v
+</span><span class="hs-identifier hs-var">HM.empty</span></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-keyword">let</span><span>
+</span><span id="line-29"></span><span>    </span><span id="local-6989586621679118402"><span class="annot"><span class="annottext">deltaPutAll :: Sample -&gt; m ()
+</span><a href="#local-6989586621679118402"><span class="hs-identifier hs-var hs-var">deltaPutAll</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">STM m () -&gt; m ()
+forall a. HasCallStack =&gt; STM m a -&gt; m a
+forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+STM m a -&gt; m a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM m () -&gt; m ()) -&gt; (Sample -&gt; STM m ()) -&gt; Sample -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer -&gt; BackBuffer -&gt; STM m ()
+forall a. TVar m a -&gt; a -&gt; STM m ()
+forall (m :: * -&gt; *) a. MonadSTM m =&gt; TVar m a -&gt; a -&gt; STM m ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer
+</span><a href="#local-6989586621679118389"><span class="hs-identifier hs-var">backBuffer</span></a></span><span> </span><span class="annot"><span class="annottext">(BackBuffer -&gt; STM m ())
+-&gt; (Sample -&gt; BackBuffer) -&gt; Sample -&gt; STM m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer
+</span><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span><span>
+</span><span id="line-30"></span><span>    </span><span id="local-6989586621679118416"><span class="annot"><span class="annottext">deltaDeltify :: Sample -&gt; m Sample
+</span><a href="#local-6989586621679118416"><span class="hs-identifier hs-var hs-var">deltaDeltify</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">STM m Sample -&gt; m Sample
+forall a. HasCallStack =&gt; STM m a -&gt; m a
+forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+STM m a -&gt; m a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM m Sample -&gt; m Sample)
+-&gt; (Sample -&gt; STM m Sample) -&gt; Sample -&gt; m Sample
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer
+-&gt; (BackBuffer -&gt; (Sample, BackBuffer)) -&gt; STM m Sample
+forall s a. TVar m s -&gt; (s -&gt; (a, s)) -&gt; STM m a
+forall (m :: * -&gt; *) s a.
+MonadSTM m =&gt;
+TVar m s -&gt; (s -&gt; (a, s)) -&gt; STM m a
+</span><span class="hs-identifier hs-var">stateTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer
+</span><a href="#local-6989586621679118389"><span class="hs-identifier hs-var">backBuffer</span></a></span><span> </span><span class="annot"><span class="annottext">((BackBuffer -&gt; (Sample, BackBuffer)) -&gt; STM m Sample)
+-&gt; (Sample -&gt; BackBuffer -&gt; (Sample, BackBuffer))
+-&gt; Sample
+-&gt; STM m Sample
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer -&gt; (Sample, BackBuffer)
+</span><a href="#local-6989586621679118418"><span class="hs-identifier hs-var">getDelta</span></a></span><span>
+</span><span id="line-31"></span><span>    </span><span id="local-6989586621679118429"><span class="annot"><span class="annottext">deltaPutDelta :: Sample -&gt; m ()
+</span><a href="#local-6989586621679118429"><span class="hs-identifier hs-var hs-var">deltaPutDelta</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">STM m () -&gt; m ()
+forall a. HasCallStack =&gt; STM m a -&gt; m a
+forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+STM m a -&gt; m a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM m () -&gt; m ()) -&gt; (Sample -&gt; STM m ()) -&gt; Sample -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer -&gt; (BackBuffer -&gt; BackBuffer) -&gt; STM m ()
+forall a. TVar m a -&gt; (a -&gt; a) -&gt; STM m ()
+forall (m :: * -&gt; *) a.
+MonadSTM m =&gt;
+TVar m a -&gt; (a -&gt; a) -&gt; STM m ()
+</span><span class="hs-identifier hs-var">modifyTVar'</span></span><span> </span><span class="annot"><span class="annottext">TVar m BackBuffer
+</span><a href="#local-6989586621679118389"><span class="hs-identifier hs-var">backBuffer</span></a></span><span> </span><span class="annot"><span class="annottext">((BackBuffer -&gt; BackBuffer) -&gt; STM m ())
+-&gt; (Sample -&gt; BackBuffer -&gt; BackBuffer) -&gt; Sample -&gt; STM m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer -&gt; BackBuffer
+</span><a href="#local-6989586621679118431"><span class="hs-identifier hs-var">putDelta</span></a></span><span>
+</span><span id="line-32"></span><span>  </span><span class="annot"><span class="annottext">Deltify m -&gt; m (Deltify m)
+forall a. a -&gt; m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#Deltify"><span class="hs-identifier hs-type">Deltify</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">Sample -&gt; m ()
+Sample -&gt; m Sample
+deltaPutAll :: Sample -&gt; m ()
+deltaDeltify :: Sample -&gt; m Sample
+deltaPutDelta :: Sample -&gt; m ()
+deltaPutAll :: Sample -&gt; m ()
+deltaDeltify :: Sample -&gt; m Sample
+deltaPutDelta :: Sample -&gt; m ()
+</span><a href="System.Metrics.Store.Deltify.html#deltaPutAll"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><a href="#local-6989586621679118431"><span class="hs-identifier hs-type">putDelta</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span>
+</span><span id="line-35"></span><span>    </span><span id="local-6989586621679118431"><span class="annot"><span class="annottext">putDelta :: Sample -&gt; BackBuffer -&gt; BackBuffer
+</span><a href="#local-6989586621679118431"><span class="hs-identifier hs-var hs-var">putDelta</span></a></span></span><span> </span><span id="local-6989586621679118432"><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118432"><span class="hs-identifier hs-var">curr</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span> </span><span id="local-6989586621679118433"><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118433"><span class="hs-identifier hs-var">prev</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer
+</span><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Sample -&gt; Sample -&gt; Sample
+forall k v. Eq k =&gt; HashMap k v -&gt; HashMap k v -&gt; HashMap k v
+</span><span class="hs-identifier hs-var">HM.union</span></span><span> </span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118432"><span class="hs-identifier hs-var">curr</span></a></span><span> </span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118433"><span class="hs-identifier hs-var">prev</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><a href="#local-6989586621679118418"><span class="hs-identifier hs-type">getDelta</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Sample</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>    </span><span id="local-6989586621679118418"><span class="annot"><span class="annottext">getDelta :: Sample -&gt; BackBuffer -&gt; (Sample, BackBuffer)
+</span><a href="#local-6989586621679118418"><span class="hs-identifier hs-var hs-var">getDelta</span></a></span></span><span> </span><span id="local-6989586621679118435"><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118435"><span class="hs-identifier hs-var">curr</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-type">BackBuffer</span></a></span><span> </span><span id="local-6989586621679118436"><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118436"><span class="hs-identifier hs-var">prev</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118437"><span class="hs-identifier hs-var">updateMetrics</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Sample -&gt; BackBuffer
+</span><a href="System.Metrics.Store.Deltify.html#BackBuffer"><span class="hs-identifier hs-var">BackBuffer</span></a></span><span> </span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118435"><span class="hs-identifier hs-var">curr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-40"></span><span>        </span><span id="local-6989586621679118437"><span class="annot"><span class="annottext">updateMetrics :: Sample
+</span><a href="#local-6989586621679118437"><span class="hs-identifier hs-var hs-var">updateMetrics</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Value -&gt; Value -&gt; Maybe Value) -&gt; Sample -&gt; Sample -&gt; Sample
+forall k v w.
+Hashable k =&gt;
+(v -&gt; w -&gt; Maybe v) -&gt; HashMap k v -&gt; HashMap k w -&gt; HashMap k v
+</span><span class="hs-identifier hs-var">HM.differenceWith</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679118443"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679118443"><span class="hs-identifier hs-var">v'</span></a></span></span><span> </span><span id="local-6989586621679118444"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679118444"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679118443"><span class="hs-identifier hs-var">v'</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/ghc-prim-0.10.0/src/GHC.Classes.html#%3D%3D"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679118444"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Maybe Value
+forall a. Maybe a
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Maybe Value
+forall a. a -&gt; Maybe a
+</span><a href="file:///nix/store/pdlvkcn31k7dw3q5bcndp7f9d2z5l0h3-ghc-9.6.7-doc/share/doc/ghc-9.6.7/html/libraries/base-4.18.3.0/src/GHC.Maybe.html#Just"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679118443"><span class="hs-identifier hs-var">v'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118435"><span class="hs-identifier hs-var">curr</span></a></span><span> </span><span class="annot"><span class="annottext">Sample
+</span><a href="#local-6989586621679118436"><span class="hs-identifier hs-var">prev</span></a></span><span>
+</span><span id="line-41"></span></pre></body></html>
